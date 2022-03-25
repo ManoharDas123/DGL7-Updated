@@ -12,7 +12,59 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-karate_club_graph = nx.karate_club_graph()
+# karate_club_graph = nx.karate_club_graph()
+
+
+import torch
+import pandas as pd
+
+from dgl.data import DGLDataset
+import torch
+import os
+
+class KarateClubDataset(DGLDataset):
+    def __init__(self):
+        super().__init__(name='karate_club')
+
+    def process(self):
+        nodes_data = pd.read_csv('./members.csv')
+        edges_data = pd.read_csv('./interactions.csv')
+        node_features = torch.from_numpy(nodes_data['Age'].to_numpy())
+        node_labels = torch.from_numpy(nodes_data['Club'].astype('category').cat.codes.to_numpy())
+        edge_features = torch.from_numpy(edges_data['Weight'].to_numpy())
+        edges_src = torch.from_numpy(edges_data['Src'].to_numpy())
+        edges_dst = torch.from_numpy(edges_data['Dst'].to_numpy())
+
+        self.graph = dgl.graph((edges_src, edges_dst), num_nodes=nodes_data.shape[0])
+        self.graph.ndata['feat'] = node_features
+        self.graph.ndata['label'] = node_labels
+        self.graph.edata['weight'] = edge_features
+
+        # If your dataset is a node classification dataset, you will need to assign
+        # masks indicating whether a node belongs to training, validation, and test set.
+        n_nodes = nodes_data.shape[0]
+        n_train = int(n_nodes * 0.6)
+        n_val = int(n_nodes * 0.2)
+        train_mask = torch.zeros(n_nodes, dtype=torch.bool)
+        val_mask = torch.zeros(n_nodes, dtype=torch.bool)
+        test_mask = torch.zeros(n_nodes, dtype=torch.bool)
+        train_mask[:n_train] = True
+        val_mask[n_train:n_train + n_val] = True
+        test_mask[n_train + n_val:] = True
+        self.graph.ndata['train_mask'] = train_mask
+        self.graph.ndata['val_mask'] = val_mask
+        self.graph.ndata['test_mask'] = test_mask
+
+    def __getitem__(self, i):
+        return self.graph
+
+    def __len__(self):
+        return 1
+
+dataset = KarateClubDataset()
+G = dataset[0]
+
+
 
 def build_karate_club_graph():
     g = dgl.DGLGraph()
@@ -82,11 +134,11 @@ def build_karate_club_graph():
 # import dgl.data
 
 # dataset = dgl.data.CoraGraphDataset()
-# print('Number of categories:', dataset.num_classes)
+# # print('Number of categories:', dataset.num_classes)
 # G = dataset[0]
-#-------------------------End Cora dataset------------------------------
+# #-------------------------End Cora dataset------------------------------
 
-#-------------------------End Citeseer dataset------------------------------
+#-------------------------Start Citeseer dataset------------------------------
 # import dgl.data
 # dataset = dgl.data.CiteseerGraphDataset()
 # G = dataset[0]
@@ -153,10 +205,13 @@ if __name__ == '__main__':
     # new_partitioing_graph.improved_partition_graph(nx_g, args.num_parts)
     # print(g.in_degrees())
 
-    new_partitioing_graph.improved_partition_graph(build_karate_club_graph(), args.num_parts, args.sample_length, args.output,
+    # new_partitioing_graph.improved_partition_graph(build_karate_club_graph(), args.num_parts, args.sample_length, args.output,
+    #                                                 args.reshuffle, balance_ntypes=balance_ntypes,
+    #                                                                 balance_edges=args.balance_edges)
+    
+    new_partitioing_graph.improved_partition_graph(G, args.num_parts, args.sample_length, args.output,
                                                     args.reshuffle, balance_ntypes=balance_ntypes,
                                                                     balance_edges=args.balance_edges)
-    
     # new_partitioing_graph.improved_partition_graph(g, args.num_parts, args.sample_length, args.output,
     #                                                 args.reshuffle, balance_ntypes=balance_ntypes,
     #                                                                 balance_edges=args.balance_edges)

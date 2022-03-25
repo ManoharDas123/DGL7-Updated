@@ -383,7 +383,8 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
     if msgseq2pos is not None:
         results = recv_responses(msgseq2pos)
         res_list.extend(results)
-
+    print("res_list",res_list)
+    print("number of node",g.number_of_nodes())
     sampled_graph = merge_graphs(res_list, g.number_of_nodes())
     return sampled_graph
 

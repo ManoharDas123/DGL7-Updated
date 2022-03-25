@@ -94,6 +94,8 @@ def load_partition(part_config, part_id):
     node_feats = load_tensors(relative_to_config(part_files['node_feats']))
     edge_feats = load_tensors(relative_to_config(part_files['edge_feats']))
     graph = load_graphs(relative_to_config(part_files['part_graph']))[0][0]
+    print("Graph is", graph.number_of_nodes())
+    print("Graph ndata is", graph.ndata)
     
     # In the old format, the feature name doesn't contain node/edge type.
     # For compatibility, let's add node/edge types to the feature names.
@@ -747,6 +749,7 @@ def partition_graph(g, num_parts, graph_name, out_path='output/', num_hops=1, pa
         if num_parts > 1:
             for ntype in g.ntypes:
                 ntype_id = g.get_ntype_id(ntype)
+                print("ntype_id",ntype_id)
                 # To get the edges in the input graph, we should use original node IDs.
                 # Both orig_id and NID stores the per-node-type IDs.
                 ndata_name = 'orig_id' if reshuffle else NID

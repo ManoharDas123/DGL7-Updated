@@ -354,7 +354,6 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
     else:
         for i, etype in enumerate(ret.canonical_etypes):
             ret.edges[etype].data[EID] = induced_edges[i]
-
     return ret
 
 def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',

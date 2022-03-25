@@ -26,6 +26,7 @@ from . import rpc
 from . import role
 from .server_state import ServerState
 from .rpc_server import start_server
+from . import graph_services
 from .graph_services import find_edges as dist_find_edges
 from .graph_services import out_degrees as dist_out_degrees
 from .graph_services import in_degrees as dist_in_degrees

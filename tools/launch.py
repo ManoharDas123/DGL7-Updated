@@ -524,6 +524,7 @@ def submit_jobs(args, udf_command):
 
 
 def main():
+    print("hello")
     parser = argparse.ArgumentParser(description='Launch a distributed job')
     parser.add_argument('--ssh_port', type=int, default=22, help='SSH Port.')
     parser.add_argument(

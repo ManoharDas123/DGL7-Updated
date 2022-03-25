@@ -171,7 +171,6 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     subg_dict = {}
     node_part = node_part.tousertensor()
     start = time.time()
-
     # This function determines whether an edge belongs to a partition.
     # An edge is assigned to a partition based on its destination node. If its destination node
     # is assigned to a partition, we assign the edge to the partition as well.
