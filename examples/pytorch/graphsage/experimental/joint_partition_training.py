@@ -15,60 +15,65 @@ import matplotlib.pyplot as plt
 import sys
 import json
 
-# class KarateClubDataset(DGLDataset):
-#     def __init__(self):
-#         super().__init__(name='karate_club')
-
-#     def process(self):
-#         nodes_data = pd.read_csv('./members.csv')
-#         edges_data = pd.read_csv('./interactions.csv')
-#         node_features = torch.from_numpy(nodes_data['Age'].to_numpy())
-#         node_labels = torch.from_numpy(nodes_data['Club'].astype('category').cat.codes.to_numpy())
-#         edge_features = torch.from_numpy(edges_data['Weight'].to_numpy())
-#         edges_src = torch.from_numpy(edges_data['Src'].to_numpy())
-#         edges_dst = torch.from_numpy(edges_data['Dst'].to_numpy())
-
-#         self.graph = dgl.graph((edges_src, edges_dst), num_nodes=nodes_data.shape[0])
-#         self.graph.ndata['feat'] = node_features
-#         self.graph.ndata['label'] = node_labels
-#         self.graph.edata['weight'] = edge_features
-
-#         # If your dataset is a node classification dataset, you will need to assign
-#         # masks indicating whether a node belongs to training, validation, and test set.
-#         n_nodes = nodes_data.shape[0]
-#         n_train = int(n_nodes * 0.6)
-#         n_val = int(n_nodes * 0.2)
-#         train_mask = torch.zeros(n_nodes, dtype=torch.bool)
-#         val_mask = torch.zeros(n_nodes, dtype=torch.bool)
-#         test_mask = torch.zeros(n_nodes, dtype=torch.bool)
-#         train_mask[:n_train] = True
-#         val_mask[n_train:n_train + n_val] = True
-#         test_mask[n_train + n_val:] = True
-#         self.graph.ndata['train_mask'] = train_mask
-#         self.graph.ndata['val_mask'] = val_mask
-#         self.graph.ndata['test_mask'] = test_mask
-
-#     def __getitem__(self, i):
-#         return self.graph
-
-#     def __len__(self):
-#         return 1
-# dataset = KarateClubDataset()
-# G = dataset[0]
-# nlabels = graph.ndata['label']
-# num_classes = dataset.num_classes
 
 import dgl.data
+#from ogb.nodeproppred import DglNodePropPredDataset
+#dataset = DglNodePropPredDataset('ogbn-arxiv')
+#dataset = dgl.data.CoraGraphDataset()
+# dataset = dgl.data.KarateClubDataset()
+
+#G, node_labels = dataset[0]
+#G = dgl.add_reverse_edges(G)
+#G.ndata['label'] = node_labels[:, 0]
+#node_features = G.ndata['feat']
+#nlabels = G.ndata['label']
+#num_classes = dataset.num_classes
+# G.is_block = False
 
 dataset = dgl.data.CoraGraphDataset()
-# dataset = dgl.data.KarateClubDataset()
-# print('Number of categories:', dataset.num_classes)
 G = dataset[0]
 nlabels = G.ndata['label']
 num_classes = dataset.num_classes
 # G.is_block = False
 
 from load_graph_copy import load_reddit, load_ogb
+
+def weight(node, sampling_length, degrees):
+    probability_weight = 1 - pow((1 - 1 / degrees[node]), sampling_length)
+    return int(probability_weight * 100)
+
+def xadj_adjncy(g, sample_length):
+    eweights = []
+    adjncy = []
+    xadj = [0]
+    degrees = (g.in_degrees()).tolist()
+    size = 1
+
+    for node in g.adj():
+        adjacency1 = (node._indices()).tolist()
+        adjacency = [item for sublist in adjacency1 for item in sublist]
+        adjncy += adjacency
+        for neighbor in adjacency:
+            eweights.append(weight(neighbor, sample_length, degrees))
+        xadj.append(xadj[size - 1] + len(adjacency))
+        size += 1
+    return [xadj, adjncy, eweights]
+
+def bias_metis_partition(num_parts, g, sample_length, xadj, adjncy, eweights):
+    partition_sets = []
+    n_cuts, membership = pymetis.part_graph(num_parts, adjacency=None, xadj=xadj, adjncy=adjncy, vweights=None, eweights=eweights, recursive=False)
+    
+    for i in range(num_parts):
+        partition_data = np.argwhere(np.array(membership) == i).ravel()
+        partition_sets.append(partition_data.tolist())
+        node_part_var = []
+        for j in range(g.number_of_nodes()):
+          g_l = [*range(0,g.number_of_nodes(), 1)]
+          if g_l[j] in partition_sets[0]:
+              node_part_var.append(0)
+          else:
+              node_part_var.append(1)
+    return [partition_data, partition_sets, node_part_var]
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser("Partition builtin graphs")
@@ -150,6 +155,8 @@ if __name__ == '__main__':
         g, _ = load_reddit()
     elif args.dataset == 'ogb-product':
         g, _ = load_ogb('ogbn-products')
+    elif args.dataset == 'ogb-arxiv':
+        g, _ = load_ogb('ogbn-arxiv')
     elif args.dataset == 'ogb-paper100M':
         g, _ = load_ogb('ogbn-papers100M')
     # print('load {} takes {:.3f} seconds'.format(args.dataset, time.time() - start))
@@ -167,52 +174,9 @@ if __name__ == '__main__':
         for key in g.ndata:
             sym_g.ndata[key] = g.ndata[key]
         g = sym_g
-
-# converts from adjacency matrix to adjacency list
-def convert(a):
-    adjList = defaultdict(list)
-    for i in range(len(a)):
-        for j in range(len(a[i])):
-            if a[i][j]== 1:
-                adjList[i].append(j)
-    return adjList
-
-def weight(node, sampling_length, degrees):
-    probability_weight = 1 - pow((1 - 1 / degrees[node]), sampling_length)
-    return int(probability_weight * 100)
-
-def xadj_adjncy(g, sample_length):
-    eweights = []
-    adjncy = []
-    xadj = [0]
-    degrees = (g.in_degrees()).tolist()
-    size = 1
-    adj = convert(g.adj())
-
-    for node in adj:
-        adjacency = adj[node]
-        adjncy += adjacency
-        for neighbor in adjacency:
-            eweights.append(weight(neighbor, sample_length, degrees))
-        xadj.append(xadj[size - 1] + len(adjacency))
-        size += 1
-    return [xadj, adjncy, eweights]
-
-def bias_metis_partition(num_parts, g, sample_length, xadj, adjncy, eweights):
-    partition_sets = []
-    n_cuts, membership = pymetis.part_graph(num_parts, adjacency=None, xadj=xadj, adjncy=adjncy, vweights=None, eweights=eweights, recursive=False)
-    
-    for i in range(num_parts):
-        partition_data = np.argwhere(np.array(membership) == i).ravel()
-        partition_sets.append(partition_data.tolist())
-        node_part_var = []
-        for j in range(g.number_of_nodes()):
-          g_l = [*range(0,g.number_of_nodes(), 1)]
-          if g_l[j] in partition_sets[0]:
-              node_part_var.append(0)
-          else:
-              node_part_var.append(1)
-    return [partition_data, partition_sets, node_part_var]
+    # xadj, adjncy, eweights = xadj_adjncy(g, args.sample_length)
+    # partition_data, partition_sets, node_part_var = bias_metis_partition(args.num_parts, g, args.sample_length, xadj, adjncy, eweights)
+    # new_partitioing_graph.improved_partition_graph(g, args.num_parts, args.sample_length, args.output, args.reshuffle, partition_data, xadj, adjncy, eweights, node_part_var, graph_name='test', balance_ntypes=None, balance_edges=False, num_hops=1, return_mapping=False)
 
 xadj, adjncy, eweights = xadj_adjncy(G, args.sample_length)
 partition_data, partition_sets, node_part_var = bias_metis_partition(args.num_parts, G, args.sample_length, xadj, adjncy, eweights)

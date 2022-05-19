@@ -25,9 +25,9 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import networkx as nx
 import torch
-import tensorflow as tf
+# import tensorflow as tf
 import torch as th
-from gnnlens import Writer
+# from gnnlens import Writer
 
 def plotGraph(graph, pos):
     nx.draw_networkx_edges(graph, pos)
@@ -64,113 +64,98 @@ flat_list = []
 def sampling_function(original_graph, alpha, k, partition_sets, xadj, adjncy, sample_count):
     edge_set = set()
     sample_picks = []
-    for node in range(len(partition_sets[0])):
-        neighbors_set = adjncy[xadj[node]:(xadj[node + 1])]
-        # print("Neighbors of each partition_set node {} are".format(node), neighbors_set)
-        node_in_partition_set = None
-        for partition in partition_sets:
-            if node in partition:
-                node_in_partition_set = partition
-                break
+    for number_of_partition in range(len(partition_sets)):
+        for node in partition_sets[number_of_partition]:
+            neighbors_set = adjncy[xadj[node]:(xadj[node + 1])]
+            # print("Neighbors of each partition_set node {} are".format(node), neighbors_set)
+            node_in_partition_set = None
+            for partition in partition_sets:
+                if node in partition:
+                    node_in_partition_set = partition
+                    break
 
-        inter = node_in_partition_set.intersection(neighbors_set)
-        x = len(inter)
-        diff = set(neighbors_set) - inter
-        y = len(diff)
-        
-        # print("Own partition neighbors of node {} is:-".format(node), inter)
-        inter_avg.append(len(inter))
-        # print("Different partition neighbors of node {} is:-".format(node), diff)
-        diff_avg.append(len(diff))
+            inter = node_in_partition_set.intersection(neighbors_set)
+            x = len(inter)
+            diff = set(neighbors_set) - inter
+            y = len(diff)
+            
+            # print("Own partition neighbors of node {} is:-".format(node), inter)
+            inter_avg.append(len(inter))
+            # print("Different partition neighbors of node {} is:-".format(node), diff)
+            diff_avg.append(len(diff))
 
-        w1 = []
-        w2 = []
-        for i in range(x):
-            w1.append(alpha)
+            w1 = []
+            w2 = []
+            for i in range(x):
+                w1.append(alpha)
 
-        for i in range(y):
-            w2.append(1)
+            for i in range(y):
+                w2.append(1)
 
-        # sample_picks = []
-        for i in range(sample_count):
-            sample_pick = random.choices(population=list(inter) + list(diff), weights=list(w1) + list(w2), k=k)
-            # sample_pick = random.choices(population=list(inter) + list(diff), k=k)
-            sample_picks.append(sample_pick)
-            # print("sample_picks", sample_picks)
-            for x in sample_pick:
-                if x is not None:
-                    edge_set.add(frozenset([node, x]))
-            # number of node which are in same partition
-            own_partition_count = 0
-            for j in sample_pick:
-                if j in node_in_partition_set:
-                    own_partition_count += 1
+            # sample_picks = []
+            for i in range(sample_count):
+                sample_pick = random.choices(population=list(inter) + list(diff), weights=list(w1) + list(w2), k=k)
+                # sample_pick = random.choices(population=list(inter) + list(diff), k=k)
+                sample_picks.append(sample_pick)
+                # print("sample_picks", sample_picks)
+                for x in sample_pick:
+                    if x is not None:
+                        edge_set.add(frozenset([node, x]))
+                # number of node which are in same partition
+                own_partition_count = 0
+                for j in sample_pick:
+                    if j in node_in_partition_set:
+                        own_partition_count += 1
 
-            # Proxy nodes are those node which are from different partition set
-            # and less than own partition set
-            if own_partition_count > 0 and own_partition_count < k:
-                proxy_node_set.add(frozenset(sample_pick))
+                # Proxy nodes are those node which are from different partition set
+                # and less than own partition set
+                if own_partition_count > 0 and own_partition_count < k:
+                    proxy_node_set.add(frozenset(sample_pick))
 
-            if node in output:
-                output[node].append(sample_pick)
-            else:
-                output[node] = [sample_pick]
-        flat_list = [item for sublist in sample_picks for item in sublist]
-        # print("edge_set of node {} is:-".format(node), edge_set)
+                if node in output:
+                    output[node].append(sample_pick)
+                else:
+                    output[node] = [sample_pick]
+            flat_list = [item for sublist in sample_picks for item in sublist]
+            # print("edge_set of node {} is:-".format(node), edge_set)
 
-        def intersection(A, B):
-            c_a = collections.Counter(A)
-            c_b = collections.Counter(B)
+            def intersection(A, B):
+                c_a = collections.Counter(A)
+                c_b = collections.Counter(B)
 
-            a = c_a.keys()
-            b = c_b.keys()
-            c = a - b
-            pp.append(c)
+                a = c_a.keys()
+                b = c_b.keys()
+                c = a - b
+                pp.append(c)
 
-            # print("Proxy Node is", c)
-            duplicates = []
-            for c in c_a:
-                duplicates += [c] * min(c_a[c], c_b[c])
-                different = c_a.keys() - duplicates
-    print()
-    # for node in output:
-    #     print("Sample set for target node {} is {}".format(node, output[node]))
-    # print()
-    flatten1 = [element for items in proxy_node_set for element in items]
-    Proxy_node_flatten = [element for items in pp for element in items]
-    print("Proxy_node_flatten", Proxy_node_flatten)
-    # print("Length of new proxy nodes", len(set(Proxy_node_flatten)))
+                # print("Proxy Node is", c)
+                duplicates = []
+                for c in c_a:
+                    duplicates += [c] * min(c_a[c], c_b[c])
+                    different = c_a.keys() - duplicates
+        print()
+        # for node in output:
+        #     print("Sample set for target node {} is {}".format(node, output[node]))
+        # print()
+        flatten1 = [element for items in proxy_node_set for element in items]
+        Proxy_node_flatten = [element for items in pp for element in items]
+        print("Proxy_node_flatten", Proxy_node_flatten)
+        # print("Length of new proxy nodes", len(set(Proxy_node_flatten)))
 
-    src_ids = []
-    dst_ids = []
-    for sp in list(edge_set):
-        sample_pick_g = list(sp)
-        src_ids.append(sample_pick_g[0])
-        dst_ids.append(sample_pick_g[1])
-    
+        src_ids = []
+        dst_ids = []
+        for sp in list(edge_set):
+            sample_pick_g = list(sp)
+            src_ids.append(sample_pick_g[0])
+            dst_ids.append(sample_pick_g[1])
     sampled_edge_set = [list(x) for x in edge_set]
     sampled_edges = [item for sublist in sampled_edge_set for item in sublist]
+        #print("Edges set of Distributed Graph", sampled_edge_set)
     sampled_node = list(set(sampled_edges))
-    # print("Edges of Sampled Graph", sampled_edge)
     sampled_1_graph = dgl.graph((sampled_edge_set))
-    sg = dgl.node_subgraph(sampled_1_graph, sampled_node)
-    destination_node = th.tensor(dst_ids)
-    # induced_node_subgraph = dgl.node_subgraph(original_graph, partition_sets[0])
-    # induced_edge_subgraph = dgl.edge_subgraph(original_graph, [th.tensor(src_ids), th.tensor(dst_ids)], preserve_nodes=True)
-    # sg = dgl.edge_subgraph(original_graph, [sampled_graph.edge_ids((th.tensor(src_ids), th.tensor(dst_ids)))], 
-    #     preserve_nodes=True)
-    # ng = sampled_graph.to_networkx()
-    # pos = nx.kamada_kawai_layout(ng)
-    # nx.draw(ng, pos, with_labels=True, node_color=[[.7, .7, .7]])
-    # plt.savefig("partition_graph.png")
-    # print("destination_node",dst_ids)
-    # writer = Writer('tutorial_graph', exist_ok=True)
-    # writer.add_graph(name='Sampled Graph', graph=sampled_graph)
-    # writer.add_graph(name='Sub Induced Graph', graph=sg)
-    # # Finish dumping
-    # writer.close()
-    # gnnlens --logdir tutorial_graph
-    return [sg, destination_node]
+    source_node = sampled_1_graph.edges()[0]
+    destination_node = sampled_1_graph.edges()[1]
+    return [sampled_1_graph, destination_node, source_node]
 
 def optimized_sampling_function(G, alpha, k, partition_sets, xadj, adjncy, sample_count=15):
     D_list = []
